@@ -1,14 +1,20 @@
+from __future__ import annotations
+
+import argparse
 import json
 import logging
 import os
+import pickle
 from collections import defaultdict
+from pathlib import Path
 from typing import TypedDict, DefaultDict
 
 from colorama import Fore, init
 from dotenv import load_dotenv
 from openai import OpenAI
-from qdrant_client import QdrantClient, models
+from qdrant_client import QdrantClient
 from qdrant_client.http.models import PointStruct
+from qdrant_client.models import Distance, VectorParams
 from tqdm import tqdm
 
 load_dotenv()
@@ -25,6 +31,13 @@ class NiceClass(TypedDict):
 
 class PayloadClass(TypedDict):
     class_id: int
+
+
+def defaultdict_to_dict(d):
+    if isinstance(d, defaultdict):
+        # Convert the defaultdict itself
+        d = {key: defaultdict_to_dict(value) for key, value in d.items()}
+    return dict(d)
 
 
 QDRANT_API_KEY = os.environ["QDRANT_API_KEY"]
@@ -51,7 +64,7 @@ EMBEDDING_DIMENSION = 3072
 OPENAI_LOGGER = "OPENAI_LOGGER"
 QDRANT_LOGGER = "QDRANT_LOGGER"
 
-QDRANT_CLIENT = QdrantClient(url=QDRANT_API_KEY, api_key=QDRANT_API_KEY)
+QDRANT_CLIENT = QdrantClient(url=QDRANT_CLUSTER, api_key=QDRANT_API_KEY)
 OPENAI_CLIENT = OpenAI()
 
 
@@ -100,8 +113,10 @@ def process_per_class(nice_class: NiceClass, qdrant_store: DefaultDict[str, Defa
             qdrant_store[field][heading_item] = (vector, payload)
 
 
-def push_qdrant_store(qdrant_store: DefaultDict[str, DefaultDict[str, tuple]]):
+def push_qdrant_store(qdrant_store: DefaultDict[str, DefaultDict[str, tuple]], skip_fields: list):
     for field in qdrant_store:
+        if field in skip_fields:
+            continue
         index = 0
         points = []
         collection_name = COLLECTION_INFO[field]["collection_name"]
@@ -115,10 +130,9 @@ def push_qdrant_store(qdrant_store: DefaultDict[str, DefaultDict[str, tuple]]):
                 )
             )
             index += 1
-        QDRANT_CLIENT.recreate_collection(
+        QDRANT_CLIENT.create_collection(
             collection_name = collection_name,
-            vectors_config = models.VectorParams(size = EMBEDDING_DIMENSION),
-            **COLLECTION_INFO[field],
+            vectors_config = VectorParams(size = EMBEDDING_DIMENSION, distance=Distance.COSINE),
         )
         QDRANT_CLIENT.upsert(
             collection_name=collection_name,
@@ -126,17 +140,32 @@ def push_qdrant_store(qdrant_store: DefaultDict[str, DefaultDict[str, tuple]]):
         )
 
 
-def main():
-    data = json.load(open("data/output.json", "r"))
+def parse_args():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("data", type=Path)
+
+    return parser.parse_args()
+
+
+def main(args):
+    data = json.load(open(args.data, "r"))
     qdrant_store = defaultdict(lambda : defaultdict(tuple))
 
     for class_data in tqdm(data, desc=Fore.RED, position=0, leave=True):
         process_per_class(class_data, qdrant_store)
 
-    push_qdrant_store(qdrant_store)
+    try:
+        with open("data/qdrant.pkl", "wb") as fp:
+            pickle.dump(defaultdict_to_dict(qdrant_store), fp)
+    except Exception as e:
+        print(e)
+        pass
+
+    push_qdrant_store(qdrant_store, ["good_or_service"])
 
 
 if __name__ == "__main__":
     init(autoreset=True)
     setup_logger()
-    main()
+    main(parse_args())
