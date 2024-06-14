@@ -149,6 +149,8 @@ def push_qdrant_store(
                 )
             )
             index += 1
+        if QDRANT_CLIENT.collection_exists(collection_name=collection_name):
+            QDRANT_CLIENT.delete_collection(collection_name=collection_name)
         QDRANT_CLIENT.create_collection(
             collection_name=collection_name,
             vectors_config=VectorParams(
