@@ -1,0 +1,7 @@
+colorama
+flask
+openai
+pip-tools
+python-dotenv
+qdrant-client
+tqdm
