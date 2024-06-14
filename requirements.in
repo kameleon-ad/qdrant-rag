@@ -1,5 +1,6 @@
 colorama
 flask
+lxml
 openai
 pip-tools
 python-dotenv

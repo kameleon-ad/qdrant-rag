@@ -28,7 +28,7 @@ INDEX_TEMPLATE = """
 """
 
 
-def create_app(config = None):
+def create_app(config=None):
     if config is None:
         config = Config
 
@@ -38,10 +38,12 @@ def create_app(config = None):
     def index():
         description = None
         result = None
-        if request.method == 'POST':
-            description = request.form.get('description')
+        if request.method == "POST":
+            description = request.form.get("description")
             if description:
                 result = NCL_AGENT(description)
-        return render_template_string(INDEX_TEMPLATE, description=description, result=result)
+        return render_template_string(
+            INDEX_TEMPLATE, description=description, result=result
+        )
 
     return app
