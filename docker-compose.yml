@@ -1,0 +1,15 @@
+services:
+  flask:
+    build: .
+    command: >
+      sh -c "flask run -h 0.0.0.0 -p 8080"
+    ports:
+      - "8080:8080"
+      - "5000:5000"
+    expose:
+      - 8080
+      - 5000
+    environment:
+      - OPENAI_API_KEY=OPENAI_API_KEY
+      - QDRANT_API_KEY=OPENAI_API_KEY
+      - QDRANT_CLUSTER=https://e2954c86-25bf-4bbb-a44b-22ccc5f28c7d.europe-west3-0.gcp.cloud.qdrant.io:6333/
